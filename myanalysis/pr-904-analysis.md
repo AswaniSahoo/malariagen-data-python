@@ -5,7 +5,7 @@
 **Author:** Mandeep Singh ([@mandeepsingh2007](https://github.com/mandeepsingh2007))
 **Reviewer/Merger:** Jon Brenas ([@jonbrenas](https://github.com/jonbrenas))
 **Merged:** 2026-02-25
-**Diff:** +244 lines, −0 lines across 3 files (entirely additive — no existing code modified)
+**Diff:** +244 lines, −0 lines across 3 files (entirely additive, no existing code modified)
 
 ---
 
@@ -13,7 +13,7 @@
 
 This PR adds a new public method `describe_api()` to the `malariagen-data-python` package. When called, it returns a pandas DataFrame listing every public method available on the API object (e.g., `ag3` or `af1`), along with a one-line summary extracted from the docstring and a category label (`"data"`, `"analysis"`, or `"plot"`). It also supports an optional `category` parameter to filter the output to only methods of a given type.
 
-The stated motivation is foundational work for the GSoC 2026 project on natural-language interfaces — an NLP system needs programmatic API discovery before it can map user queries to the right methods.
+The stated motivation is foundational work for the GSoC 2026 project on natural-language interfaces: an NLP system needs programmatic API discovery before it can map user queries to the right methods.
 
 ### Jon's review comment
 
@@ -21,13 +21,13 @@ Jon approved the PR with the comment:
 
 > *"LGTM. I am not sure it is as useful for users as it is for automated systems but it doesn't hurt to have the option."*
 
-This is a significant observation. Jon sees `describe_api()` as primarily useful for *automated* systems rather than human users — which aligns exactly with its intended role as a foundation for NLP-based query translation.
+This is a significant observation. Jon sees `describe_api()` as primarily useful for *automated* systems rather than human users, which aligns exactly with its intended role as a foundation for NLP-based query translation.
 
 In a follow-up comment after approval, Jon added an important architectural clarification:
 
 > *"The outcome of Project 3 would have to be a tool built on the API for data access but separate from it... Some parts of the proposal may require changes in the API but not all of them. I think the content of this PR is a valuable step towards a solution to Project 3, hence the approval."*
 
-This is the clearest articulation of where `describe_api()` sits in the broader picture: it lives *inside* the API as a discovery endpoint, while the NLP interface itself must live *outside* the API, calling it as a user would. The PR does not start building the NLP tool — it creates the programmatic hook that such a tool would use. The boundary between the two is important: the API provides data and methods, the external tool provides the natural-language layer.
+This is the clearest articulation of where `describe_api()` sits in the broader picture: it lives *inside* the API as a discovery endpoint, while the NLP interface itself must live *outside* the API, calling it as a user would. The PR does not start building the NLP tool; it creates the programmatic hook that such a tool would use. The boundary between the two is important: the API provides data and methods, the external tool provides the natural-language layer.
 
 ---
 
@@ -68,17 +68,17 @@ class AnophelesDataResource(
 ):
 ```
 
-This positioning is important because of Python's C3 linearization algorithm, which determines the method resolution order (MRO). Since `AnophelesDescribe` inherits from `AnophelesBase`, it must appear *before* `AnophelesBase` in the parent list — otherwise Python would encounter `AnophelesBase` twice in conflicting positions and raise a `TypeError`. The `super().__init__(**kwargs)` call in `AnophelesBase.__init__()` is designed to work cooperatively, passing remaining keyword arguments up the chain so that all mixins get properly initialised.
+This positioning is important because of Python's C3 linearization algorithm, which determines the method resolution order (MRO). Since `AnophelesDescribe` inherits from `AnophelesBase`, it must appear *before* `AnophelesBase` in the parent list; otherwise Python would encounter `AnophelesBase` twice in conflicting positions and raise a `TypeError`. The `super().__init__(**kwargs)` call in `AnophelesBase.__init__()` is designed to work cooperatively, passing remaining keyword arguments up the chain so that all mixins get properly initialised.
 
 ### Why a separate mixin (instead of adding to an existing class)
 
-The method could have been added directly to `AnophelesBase`, which would have been simpler (no new file, no MRO change). But the codebase convention is clear: each mixin handles a distinct functional area. `AnophelesBase` handles configuration, caching, filesystem initialisation, and GCS location checking. API introspection is a different concern — it is about *discovering* the API, not about *running* data queries. Keeping it in its own mixin follows the separation-of-concerns pattern established by `AnophelesFstAnalysis`, `AnophelesPca`, `AnophelesHapData`, etc.
+The method could have been added directly to `AnophelesBase`, which would have been simpler (no new file, no MRO change). But the codebase convention is clear: each mixin handles a distinct functional area. `AnophelesBase` handles configuration, caching, filesystem initialisation, and GCS location checking. API introspection is a different concern: it is about *discovering* the API, not about *running* data queries. Keeping it in its own mixin follows the separation-of-concerns pattern established by `AnophelesFstAnalysis`, `AnophelesPca`, `AnophelesHapData`, etc.
 
 ---
 
 ## 4. The Three Core Components of `describe_api()`
 
-### 4a. Method discovery — walking `dir(self)`
+### 4a. Method discovery: walking `dir(self)`
 
 ```python
 for name in sorted(dir(self)):
@@ -96,12 +96,12 @@ for name in sorted(dir(self)):
 **What this does:** Iterates over all attributes of the instance, sorted alphabetically. It filters out:
 - Private/dunder methods (names starting with `_`)
 - `None` attributes (names that exist in `dir()` but not as class attributes)
-- Properties (e.g., `contigs`, `site_mask_ids` — these are data attributes, not callable methods)
+- Properties (e.g., `contigs`, `site_mask_ids`, which are data attributes, not callable methods)
 - Non-callable attributes
 
-**A subtle choice — `getattr(type(self), name, None)` vs `getattr(self, name)`:** The code looks up the attribute on the *class* (`type(self)`), not on the *instance*. This is intentional — looking up on the class avoids triggering property getters or descriptors that might have side effects or require data access. For method introspection, you want the unbound function object, not a bound method or computed value.
+**A subtle choice: `getattr(type(self), name, None)` vs `getattr(self, name)`.** The code looks up the attribute on the *class* (`type(self)`), not on the *instance*. This is intentional: looking up on the class avoids triggering property getters or descriptors that might have side effects or require data access. For method introspection, you want the unbound function object, not a bound method or computed value.
 
-### 4b. Summary extraction — `_extract_summary()`
+### 4b. Summary extraction: `_extract_summary()`
 
 ```python
 @staticmethod
@@ -119,12 +119,12 @@ def _extract_summary(method) -> str:
 **What this does:** Uses `inspect.getdoc()` to retrieve the docstring of a method, then returns the first non-empty line as a short summary.
 
 **Why `inspect.getdoc()` and not `method.__doc__`?** `inspect.getdoc()` does two important things that `__doc__` does not:
-1. It cleans up indentation — docstrings in methods are typically indented to match the method body, and `inspect.getdoc()` strips this leading whitespace consistently
-2. It resolves inherited docstrings — if a method overrides a parent method but doesn't define its own docstring, `inspect.getdoc()` will walk up the MRO to find one
+1. It cleans up indentation: docstrings in methods are typically indented to match the method body, and `inspect.getdoc()` strips this leading whitespace consistently
+2. It resolves inherited docstrings: if a method overrides a parent method but doesn't define its own docstring, `inspect.getdoc()` will walk up the MRO to find one
 
-**Interaction with `numpydoc_decorator`:** Most methods in the codebase use the `@doc(summary="...", ...)` decorator from `numpydoc_decorator`. This decorator generates a formatted docstring from the keyword arguments and assigns it to the function's `__doc__` attribute. The `summary` parameter becomes the first line of the generated docstring. Because `_extract_summary()` takes the first non-empty line, it reliably recovers the original summary text that the author wrote in the `@doc()` call. This works because of a convention — the `@doc` decorator always puts the summary first — rather than because of any explicit contract between `describe.py` and `numpydoc_decorator`.
+**Interaction with `numpydoc_decorator`:** Most methods in the codebase use the `@doc(summary="...", ...)` decorator from `numpydoc_decorator`. This decorator generates a formatted docstring from the keyword arguments and assigns it to the function's `__doc__` attribute. The `summary` parameter becomes the first line of the generated docstring. Because `_extract_summary()` takes the first non-empty line, it reliably recovers the original summary text that the author wrote in the `@doc()` call. This works because of a convention (the `@doc` decorator always puts the summary first) rather than because of any explicit contract between `describe.py` and `numpydoc_decorator`.
 
-### 4c. Method categorisation — `_categorize_method()`
+### 4c. Method categorisation: `_categorize_method()`
 
 ```python
 @staticmethod
@@ -146,21 +146,21 @@ def _categorize_method(name: str) -> str:
 **Why this approach was chosen and its trade-offs:**
 
 *Strengths:*
-- Simple and fast — no need to inspect method signatures, decorators, or return types
-- Deterministic — the same method name always gets the same category
-- Covers the current codebase well — every existing public method follows the naming convention
+- Simple and fast: no need to inspect method signatures, decorators, or return types
+- Deterministic: the same method name always gets the same category
+- Covers the current codebase well: every existing public method follows the naming convention
 
 *Weaknesses:*
 - **Hardcoded prefixes are fragile.** If a new data access method is added with a prefix not in the tuple (e.g., `phenotype_data()`), it would be misclassified as `"analysis"`. The tuple would need manual updating. There is no mechanism to warn a developer that they should add their new prefix to this list.
 - **The "analysis" default is a catch-all.** Methods like `pairwise_average_fst`, `average_fst`, `fst_gwss`, `diversity_stats`, and `cohort_diversity_stats` are all classified as "analysis" not because they positively match a pattern, but because they don't match `"plot_"` or any data prefix. This means any non-standard method (including `describe_api` itself) falls into "analysis" by default.
-- **`describe_api()` is categorised as "analysis"** even though it is neither data access, analysis, nor plotting — it is introspection/meta. A more granular category scheme (e.g., adding `"meta"` or `"utility"`) could be more accurate, but would add complexity for a single method.
+- **`describe_api()` is categorised as "analysis"** even though it is neither data access, analysis, nor plotting: it is introspection/meta. A more granular category scheme (e.g., adding `"meta"` or `"utility"`) could be more accurate, but would add complexity for a single method.
 
 *Alternative approaches that could have been used:*
-1. **Decorator-based tagging** — e.g., `@data_method`, `@plot_method`, `@analysis_method` decorators that attach metadata. More robust, but would require modifying every existing method in the codebase — a much larger change.
-2. **Docstring-based detection** — parse the `@doc()` parameters for category hints. Would couple categorisation to documentation format.
-3. **Return type inspection** — plot methods return `Figure` objects, data methods return DataFrames/arrays. Would require calling `get_type_hints()` on each method, which could be expensive and error-prone with complex annotations.
+1. **Decorator-based tagging**: e.g., `@data_method`, `@plot_method`, `@analysis_method` decorators that attach metadata. More robust, but would require modifying every existing method in the codebase, a much larger change.
+2. **Docstring-based detection**: parse the `@doc()` parameters for category hints. Would couple categorisation to documentation format.
+3. **Return type inspection**: plot methods return `Figure` objects, data methods return DataFrames/arrays. Would require calling `get_type_hints()` on each method, which could be expensive and error-prone with complex annotations.
 
-The prefix-based approach was the right pragmatic choice for a first implementation — it works correctly for all current methods and can be extended later if needed.
+The prefix-based approach was the right pragmatic choice for a first implementation: it works correctly for all current methods and can be extended later if needed.
 
 ---
 
@@ -185,9 +185,9 @@ Using `Literal["data", "analysis", "plot"]` with `@_check_types` would have been
 
 ---
 
-## 6. Testing Strategy — 14 Tests
+## 6. Testing Strategy: 14 Tests
 
-The test file (`test_describe.py`) creates separate `AnophelesDescribe` fixtures for both the Ag3 and Af1 simulators, using `pytest_cases`'s `@parametrize_with_cases` decorator. This means each test runs twice — once against an Ag3-shaped API and once against an Af1-shaped API — producing 14 test results from 7 test functions.
+The test file (`test_describe.py`) creates separate `AnophelesDescribe` fixtures for both the Ag3 and Af1 simulators, using `pytest_cases`'s `@parametrize_with_cases` decorator. This means each test runs twice, once against an Ag3-shaped API and once against an Af1-shaped API, producing 14 test results from 7 test functions.
 
 | Test | What It Verifies |
 |------|------------------|
@@ -206,15 +206,15 @@ The test file (`test_describe.py`) creates separate `AnophelesDescribe` fixtures
 - The standalone `test_categorize_method` and `test_extract_summary` tests exercise the helper functions in isolation, independent of any API fixture
 
 **What the tests do not cover:**
-- **Completeness** — there is no assertion that the output contains *all* public methods. A method could be silently excluded (e.g., if `getattr(type(self), name, None)` returns `None` for some reason) and no test would catch it.
-- **Category correctness** — the test only checks that filtering works, not that specific methods have the correct category. For example, there is no assertion that `pairwise_average_fst` is categorised as `"analysis"` when called through the full `AnophelesDataResource`, rather than the standalone `AnophelesDescribe` fixture.
-- **Summary accuracy** — no test checks that a specific method's summary matches its `@doc(summary="...")` value.
+- **Completeness**: there is no assertion that the output contains *all* public methods. A method could be silently excluded (e.g., if `getattr(type(self), name, None)` returns `None` for some reason) and no test would catch it.
+- **Category correctness**: the test only checks that filtering works, not that specific methods have the correct category. For example, there is no assertion that `pairwise_average_fst` is categorised as `"analysis"` when called through the full `AnophelesDataResource`, rather than the standalone `AnophelesDescribe` fixture.
+- **Summary accuracy**: no test checks that a specific method's summary matches its `@doc(summary="...")` value.
 
-These gaps are acceptable for a first implementation — the method is primarily about discovery, not about guaranteeing perfect metadata.
+These gaps are acceptable for a first implementation: the method is primarily about discovery, not about guaranteeing perfect metadata.
 
 ---
 
-## 7. What `describe_api()` Provides — and What It Does Not
+## 7. What `describe_api()` Provides, and What It Does Not
 
 This is the most important section for understanding the PR's role in the broader NLP interface project.
 
@@ -226,7 +226,7 @@ This is the most important section for understanding the PR's role in the broade
 | `summary` | `"Compute pairwise average Hudson's Fst between a set of specified cohorts."` | First line of docstring via `inspect.getdoc()` |
 | `category` | `"analysis"` | Name prefix matching |
 
-This is enough for a basic question: *"Which method should I call to compare genetic differentiation between populations?"* — an NLP system can match the user's intent against the summary descriptions to find `pairwise_average_fst`.
+This is enough for a basic question: *"Which method should I call to compare genetic differentiation between populations?"* An NLP system can match the user's intent against the summary descriptions to find `pairwise_average_fst`.
 
 ### What it does NOT provide (parameter-level detail)
 
@@ -256,7 +256,7 @@ But to generate the actual call, it also needs:
 4. ❌ Know that `sample_query="country == 'Kenya'"` is how you filter by country
 5. ❌ Know that `min_cohort_size=10` is a sensible default
 
-Steps 2–5 require parameter-level introspection that `describe_api()` does not provide. This is the gap between method-level discovery and code generation — and it is exactly the space where a natural-language interface project would build.
+Steps 2–5 require parameter-level introspection that `describe_api()` does not provide. This is the gap between method-level discovery and code generation, and it is exactly the space where a natural-language interface project would build.
 
 ---
 
@@ -273,8 +273,8 @@ This is effectively a **structured schema** for the entire API, embedded in the 
 
 ### Jon's review comment as a design signal
 
-Jon's observation that `describe_api()` is *"useful for automated systems"* rather than human users is not just a passing comment — it reflects a genuine architectural property. Human users of `malariagen-data-python` typically work in Jupyter notebooks where tab-completion, `?` help, and the training course materials provide method discovery. A flat DataFrame of all methods is less useful than these interactive tools. But for an automated system — whether an NLP query translator, a code generator, or a testing framework — a structured, programmatically queryable method registry is exactly the right interface.
+Jon's observation that `describe_api()` is *"useful for automated systems"* rather than human users is not just a passing comment; it reflects a genuine architectural property. Human users of `malariagen-data-python` typically work in Jupyter notebooks where tab-completion, `?` help, and the training course materials provide method discovery. A flat DataFrame of all methods is less useful than these interactive tools. But for an automated system, whether an NLP query translator, a code generator, or a testing framework, a structured, programmatically queryable method registry is exactly the right interface.
 
 ---
 
-*Author: Aswani Sahoo — March 2026*
+*Author: Aswani Sahoo, March 2026*
